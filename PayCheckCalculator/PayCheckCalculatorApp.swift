@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct PayCheckCalculatorApp: App {
+    @AppStorage("userName") private var storedName: String?
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if storedName == nil {
+                OnboardingView()
+            } else {
+                PaycheckView()
+            }
         }
     }
 }
