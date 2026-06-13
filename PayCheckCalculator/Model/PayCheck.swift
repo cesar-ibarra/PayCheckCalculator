@@ -10,39 +10,55 @@ import SwiftData
 
 @Model
 class Paycheck {
-    var grossIncome: Double
+    var grossPay: Double
     var federalTax: Double
     var socialSecurityTax: Double
     var medicareTax: Double
     var stateTax: Double
-    var netIncome: Double
-    var hoursWorked: Int
+    var caSDITax: Double
+    var netPay: Double
+    var regularHours: Double
+    var overtimeHours: Double
     var hourlyRate: Double
+    var overtimeRate: Double
     var state: String
+    var payPeriodRaw: String
+    var filingStatusRaw: String
 
-    init(hoursWorked: Int, hourlyRate: Double, state: String) {
-        self.hoursWorked = hoursWorked
+    init(
+        regularHours: Double,
+        hourlyRate: Double,
+        overtimeHours: Double = 0,
+        overtimeRate: Double = 0,
+        state: String,
+        payPeriod: PayPeriod = .biweekly,
+        filing: FilingStatus = .single
+    ) {
+        self.regularHours = regularHours
         self.hourlyRate = hourlyRate
+        self.overtimeHours = overtimeHours
+        self.overtimeRate = overtimeRate
         self.state = state
+        self.payPeriodRaw = payPeriod.rawValue
+        self.filingStatusRaw = filing.rawValue
 
-        // Primero, calcular Gross Income
-        let calculatedGrossIncome = Double(hoursWorked) * hourlyRate
+        let result = PaycheckCalculator.calculate(
+            regularHours: regularHours,
+            hourlyRate: hourlyRate,
+            overtimeHours: overtimeHours,
+            overtimeRate: overtimeRate,
+            state: state,
+            payPeriod: payPeriod,
+            filing: filing
+        )
 
-        // Luego, calcular impuestos usando variables locales
-        let calculatedFederalTax = PaycheckCalculator.calculateFederalTax(income: calculatedGrossIncome)
-        let calculatedSocialSecurityTax = PaycheckCalculator.calculateSocialSecurityTax(income: calculatedGrossIncome)
-        let calculatedMedicareTax = PaycheckCalculator.calculateMedicareTax(income: calculatedGrossIncome)
-        let calculatedStateTax = PaycheckCalculator.calculateStateTax(income: calculatedGrossIncome, state: state)
-
-        // Calcular Net Income
-        let calculatedNetIncome = calculatedGrossIncome - (calculatedFederalTax + calculatedSocialSecurityTax + calculatedMedicareTax + calculatedStateTax)
-
-        // Finalmente, asignar los valores a las propiedades
-        self.grossIncome = calculatedGrossIncome
-        self.federalTax = calculatedFederalTax
-        self.socialSecurityTax = calculatedSocialSecurityTax
-        self.medicareTax = calculatedMedicareTax
-        self.stateTax = calculatedStateTax
-        self.netIncome = calculatedNetIncome
+        self.grossPay = result.grossPay
+        self.federalTax = result.federalTax
+        self.socialSecurityTax = result.socialSecurityTax
+        self.medicareTax = result.medicareTax
+        self.stateTax = result.stateTax
+        self.caSDITax = result.caSDITax
+        self.netPay = result.netPay
     }
 }
+

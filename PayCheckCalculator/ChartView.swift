@@ -6,21 +6,20 @@
 //
 
 import SwiftUI
-import SwiftUI
 import Charts
 
 struct ChartView: View {
     var viewModel: PaycheckViewModel
-    
+
     var body: some View {
         VStack {
             Text("Income & Deductions Breakdown")
                 .font(.headline)
-            
+
             Chart {
                 BarMark(
-                    x: .value("Category", "Gross Income"),
-                    y: .value("Amount", viewModel.grossIncome)
+                    x: .value("Category", "Gross Pay"),
+                    y: .value("Amount", viewModel.grossPay)
                 )
                 .foregroundStyle(.green)
 
@@ -48,9 +47,17 @@ struct ChartView: View {
                 )
                 .foregroundStyle(.orange)
 
+                if viewModel.showCASDI {
+                    BarMark(
+                        x: .value("Category", "CA SDI"),
+                        y: .value("Amount", viewModel.caSDITax)
+                    )
+                    .foregroundStyle(.cyan)
+                }
+
                 BarMark(
-                    x: .value("Category", "Net Income"),
-                    y: .value("Amount", viewModel.netIncome)
+                    x: .value("Category", "Net Pay"),
+                    y: .value("Amount", viewModel.netPay)
                 )
                 .foregroundStyle(.green.opacity(0.7))
             }
