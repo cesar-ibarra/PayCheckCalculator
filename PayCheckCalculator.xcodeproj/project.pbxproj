@@ -7,10 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		348069A03043CA9F00716A70 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3480699F3043CA9F00716A70 /* StoreKit.framework */; };
 		34AF305C2D8A73C8004F50B4 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 34AF305B2D8A73C8004F50B4 /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3480699F3043CA9F00716A70 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		34A2BAA52D87754A00156530 /* PayCheckCalculator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PayCheckCalculator.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -41,16 +43,26 @@
 			buildActionMask = 2147483647;
 			files = (
 				34AF305C2D8A73C8004F50B4 /* GoogleMobileAds in Frameworks */,
+				348069A03043CA9F00716A70 /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3480699E3043CA9F00716A70 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3480699F3043CA9F00716A70 /* StoreKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		34A2BA9C2D87754A00156530 = {
 			isa = PBXGroup;
 			children = (
 				34A2BAA72D87754A00156530 /* PayCheckCalculator */,
+				3480699E3043CA9F00716A70 /* Frameworks */,
 				34A2BAA62D87754A00156530 /* Products */,
 			);
 			sourceTree = "<group>";

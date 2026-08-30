@@ -50,6 +50,9 @@
             ReferencedContainer = "container:PayCheckCalculator.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "../../PayCheckCalculator/Easy Paycheck Calculator.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

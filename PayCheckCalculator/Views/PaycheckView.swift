@@ -6,10 +6,16 @@
 //
 
 import SwiftUI
+import TipKit
 
 struct PaycheckView: View {
     @State private var viewModel = PaycheckViewModel()
     @State private var showResults = false
+    @State private var pendingAd = false
+    @State private var showRemoveAdsSheet = false
+    @ObservedObject private var iap = IAPManager.shared
+    @StateObject private var interstitialAd = InterstitialAdManager()
+    private let removeAdsTip = RemoveAdsTip()
 
     let states = [
         "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
@@ -31,31 +37,48 @@ struct PaycheckView: View {
             ScrollView {
                 VStack(spacing: 20) {
 
-                    // MARK: - Input Form (always visible)
+                    // MARK: - Input Form
                     InputCard(title: "Pay Details", systemImage: "clock.fill") {
                         InputRow(label: "Regular Hours") {
                             NumericField(value: $vm.regularHours,
                                          format: .number.precision(.fractionLength(2)))
                         }
                         InputRow(label: "Hourly Rate") {
-                            NumericField(value: $vm.hourlyRate,
-                                         format: .currency(code: "USD"))
+                            CurrencyField(value: $vm.hourlyRate)
                         }
                         InputRow(label: "OT Hours") {
                             NumericField(value: $vm.overtimeHours,
                                          format: .number.precision(.fractionLength(2)))
                         }
                         InputRow(label: "OT Rate", showDivider: false) {
-                            NumericField(value: $vm.overtimeRate,
-                                         format: .currency(code: "USD"))
+                            CurrencyField(value: $vm.overtimeRate)
                         }
                     }
 
                     // MARK: - Calculate Button
                     Button {
                         hideKeyboard()
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            showResults = true
+                        if !iap.hasRemovedAds {
+                            if interstitialAd.isReady,
+                               let rootVC = UIApplication.shared.currentUIWindow()?.rootViewController {
+                                // Ad ready — show immediately, results appear after dismiss
+                                interstitialAd.show(from: rootVC)
+                                interstitialAd.onDismiss = {
+                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                        showResults = true
+                                    }
+                                }
+                            } else {
+                                // Ad not ready yet — flag it, show results now
+                                pendingAd = true
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    showResults = true
+                                }
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showResults = true
+                            }
                         }
                     } label: {
                         Text("Calculate")
@@ -66,12 +89,8 @@ struct PaycheckView: View {
                             .background(.blue, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    
-                    AdMobBanner()
-                        .frame(width: 320, height: 50)
-                        .transition(.opacity)
-                    
-                    // MARK: - Results (animated in)
+
+                    // MARK: - Results
                     if showResults {
                         VStack(spacing: 16) {
 
@@ -87,7 +106,6 @@ struct PaycheckView: View {
                                     removal: .opacity.combined(with: .move(edge: .top))
                                 ))
 
-                            // More Settings
                             InputCard(title: "Tax Settings", systemImage: "building.columns.fill") {
                                 InputRow(label: "Pay Period") {
                                     Picker("", selection: $vm.payPeriod) {
@@ -108,18 +126,23 @@ struct PaycheckView: View {
                                     .pickerStyle(.menu).tint(.primary)
                                 }
                                 InputRow(label: "Other Deductions") {
-                                    NumericField(value: $vm.otherDeductions,
-                                                 format: .currency(code: "USD"))
+                                    CurrencyField(value: $vm.otherDeductions)
                                 }
                                 InputRow(label: "Extra Withholding", showDivider: false) {
-                                    NumericField(value: $vm.extraWithholding,
-                                                 format: .currency(code: "USD"))
+                                    CurrencyField(value: $vm.extraWithholding)
                                 }
                             }
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .move(edge: .bottom)),
                                 removal: .opacity.combined(with: .move(edge: .top))
                             ))
+
+                            // Banner ad — only if ads not removed
+                            if !iap.hasRemovedAds {
+                                AdMobBanner()
+                                    .frame(width: 320, height: 50)
+                                    .transition(.opacity)
+                            }
 
                             Text("Estimates based on 2024 IRS tax tables.\nActual withholding may vary.")
                                 .font(.footnote)
@@ -137,6 +160,19 @@ struct PaycheckView: View {
             .navigationTitle("Paycheck Calculator")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                // Sparkles — Remove Ads
+                ToolbarItem(placement: .topBarLeading) {
+                    if !iap.hasRemovedAds {
+                        Button {
+                            showRemoveAdsSheet = true
+                        } label: {
+                            Image(systemName: "sparkles")
+                        }
+                        .tint(.yellow)
+                        .popoverTip(removeAdsTip)
+                    }
+                }
+                // Clear
                 if showResults {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -154,6 +190,16 @@ struct PaycheckView: View {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") { hideKeyboard() }
+                }
+            }
+            .sheet(isPresented: $showRemoveAdsSheet) {
+                RemoveAdsSheetView()
+            }
+            .onChange(of: interstitialAd.isReady) { _, ready in
+                if ready, pendingAd, !iap.hasRemovedAds,
+                   let rootVC = UIApplication.shared.currentUIWindow()?.rootViewController {
+                    pendingAd = false
+                    interstitialAd.show(from: rootVC)
                 }
             }
         }
@@ -350,13 +396,87 @@ struct NumericField<F: ParseableFormatStyle>: View
 where F.FormatOutput == String, F.FormatInput == Double {
     @Binding var value: Double
     let format: F
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        TextField("", value: $value, format: format)
+        TextField("0", text: $text)
             .keyboardType(.decimalPad)
             .multilineTextAlignment(.trailing)
             .frame(width: 120)
             .font(.body.monospacedDigit())
+            .focused($isFocused)
+            .onAppear {
+                text = value == 0 ? "" : plainString(value)
+            }
+            .onChange(of: isFocused) { _, focused in
+                if focused {
+                    // Clear field when user taps in so they start fresh
+                    if value == 0 { text = "" }
+                } else {
+                    // On blur, parse and reformat
+                    let parsed = Double(text.filter { $0.isNumber || $0 == "." }) ?? 0
+                    value = parsed
+                    text = parsed == 0 ? "" : plainString(parsed)
+                }
+            }
+            .onChange(of: text) { _, newText in
+                let cleaned = newText.filter { $0.isNumber || $0 == "." }
+                value = Double(cleaned) ?? 0
+            }
+            .onChange(of: value) { _, newVal in
+                // Sync when reset() is called externally
+                if !isFocused {
+                    text = newVal == 0 ? "" : plainString(newVal)
+                }
+            }
+    }
+
+    private func plainString(_ v: Double) -> String {
+        v.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", v)
+            : String(format: "%.2f", v)
+    }
+}
+
+struct CurrencyField: View {
+    @Binding var value: Double
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text("$")
+                .font(.body.monospacedDigit())
+                .foregroundStyle(value == 0 && !isFocused ? .tertiary : .primary)
+            TextField("0.00", text: $text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 100)
+                .font(.body.monospacedDigit())
+                .focused($isFocused)
+                .onAppear {
+                    text = value == 0 ? "" : String(format: "%.2f", value)
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if focused {
+                        if value == 0 { text = "" }
+                    } else {
+                        let parsed = Double(text.filter { $0.isNumber || $0 == "." }) ?? 0
+                        value = parsed
+                        text = parsed == 0 ? "" : String(format: "%.2f", parsed)
+                    }
+                }
+                .onChange(of: text) { _, newText in
+                    let cleaned = newText.filter { $0.isNumber || $0 == "." }
+                    value = Double(cleaned) ?? 0
+                }
+                .onChange(of: value) { _, newVal in
+                    if !isFocused {
+                        text = newVal == 0 ? "" : String(format: "%.2f", newVal)
+                    }
+                }
+        }
     }
 }
 
