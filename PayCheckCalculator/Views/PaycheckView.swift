@@ -16,6 +16,17 @@ struct PaycheckView: View {
     @ObservedObject private var iap = IAPManager.shared
     @StateObject private var interstitialAd = InterstitialAdManager()
     private let removeAdsTip = RemoveAdsTip()
+    @AppStorage("userName") private var storedName: String?
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let name = storedName ?? ""
+        switch hour {
+        case 0..<12:  return "Good morning, \(name)"
+        case 12..<18: return "Good afternoon, \(name)"
+        default:      return "Good evening, \(name)"
+        }
+    }
 
     let states = [
         "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
@@ -36,6 +47,20 @@ struct PaycheckView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+
+                    // MARK: - Greeting Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(greeting)
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary)
+                            Text("Let's calculate your paycheck")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 4)
 
                     // MARK: - Input Form
                     InputCard(title: "Pay Details", systemImage: "clock.fill") {
@@ -58,26 +83,20 @@ struct PaycheckView: View {
                     // MARK: - Calculate Button
                     Button {
                         hideKeyboard()
+                        // Always show results immediately
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            showResults = true
+                        }
+                        // Show ad after 5 seconds (only if ads not removed)
                         if !iap.hasRemovedAds {
-                            if interstitialAd.isReady,
-                               let rootVC = UIApplication.shared.currentUIWindow()?.rootViewController {
-                                // Ad ready — show immediately, results appear after dismiss
-                                interstitialAd.show(from: rootVC)
-                                interstitialAd.onDismiss = {
-                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                        showResults = true
-                                    }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                                if interstitialAd.isReady,
+                                   let rootVC = UIApplication.shared.currentUIWindow()?.rootViewController {
+                                    interstitialAd.show(from: rootVC)
+                                } else {
+                                    // Ad still loading — flag to show when ready
+                                    pendingAd = true
                                 }
-                            } else {
-                                // Ad not ready yet — flag it, show results now
-                                pendingAd = true
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                    showResults = true
-                                }
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                showResults = true
                             }
                         }
                     } label: {
@@ -158,7 +177,7 @@ struct PaycheckView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Paycheck Calculator")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // Sparkles — Remove Ads
                 ToolbarItem(placement: .topBarLeading) {
