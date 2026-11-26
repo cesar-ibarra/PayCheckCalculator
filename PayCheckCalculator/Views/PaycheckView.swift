@@ -136,7 +136,7 @@ struct PaycheckView: View {
                                     Picker("", selection: $vm.filingStatus) {
                                         ForEach(FilingStatus.allCases) { Text($0.rawValue).tag($0) }
                                     }
-                                    .pickerStyle(.menu).tint(.primary)
+                                    .pickerStyle(.menu).tint(.primary).font(.footnote)
                                 }
                                 InputRow(label: "State") {
                                     Picker("", selection: $vm.state) {
